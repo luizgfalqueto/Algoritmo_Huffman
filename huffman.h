@@ -4,8 +4,9 @@
 typedef struct nodeHuff
 {
     char caracter;
-    int freq;
+    int freq, bit;
     struct nodeHuff *left, *right, *next;
+    int *codigo;
 } NodeHuff;
 
 typedef struct queueHuff
@@ -38,8 +39,10 @@ Queue *buildQueue(Queue *queue, unsigned *vetor);
 
 Queue *buildTree(Queue *queue);
 
-void comprimir(FILE *entrada, Queue *queue, FILE *saida);
+void comprimir(FILE *entrada, Queue *queue, Queue *queue2, FILE *saida);
 
-int geraCodigo(FILE *saida, NodeHuff *raiz, unsigned c);
+void defineCodigo(Queue *queue, NodeHuff *node, NodeHuff *node2, int tamanho, int *v);
+
+void exibirCaracteres(Queue *queue);
 
 #endif //HUFFMAN_H

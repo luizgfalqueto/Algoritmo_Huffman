@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <math.h>
 #include "huffman.h"
 
 /*Função responsável por criar um nó
@@ -218,70 +220,97 @@ void printTree(NodeHuff *raiz, int nivel)
         printTree(raiz->right, nivel + 1);
         for (i = 0; i < nivel; i++)
             printf("\t");
-        printf("[%c | %d]\n", raiz->caracter, raiz->freq); //Imprime o caractere e a frequência do nó
+        if (raiz->caracter != '+')
+            printf("[%c | %d]\n", raiz->caracter, raiz->freq); //Imprime o caractere e a frequência do nó
+        else
+            printf("[%d]\n", raiz->freq);
         printTree(raiz->left, nivel + 1);
     }
 }
 
-int geraCodigo(FILE *saida, NodeHuff *raiz, unsigned c)
+void defineCodigo(Queue *queue, NodeHuff *node, NodeHuff *node2, int tamanho, int *v)
 {
-    if (!(raiz->left || raiz->right) && raiz->caracter == c)
-    {
-        putc('\0', saida);
-        return 1;
+    if (queue->first != NULL)
+    { //se a árvore nao for vazia
+        if (node->left)
+        { //se tiver filho a esquerda, chama de forma recursiva passando o proximo no a esquerda
+            v[tamanho - 1] = 0;
+            defineCodigo(queue, node->left, node2, tamanho + 1, v);
+        }
+        if (node->right)
+        { //se tiver filho a direita, chama de forma recursiva passando o proximo no a direita
+            v[tamanho - 1] = 1;
+            defineCodigo(queue, node->right, node2, tamanho + 1, v);
+        }
+        else
+        { //caso seja um nó folha
+            if (node->caracter != '+')
+            { //se o nó for um caracter usado no arquivo
+                NodeHuff *aux = node2;
+                while (aux->next != NULL && node->caracter != aux->caracter)
+                { //Encontrando os caracteres correspondentes da arvore e da fila
+                    aux = aux->next;
+                }
+                aux->codigo = (int *)malloc(tamanho * sizeof(int)); //Alocando espaço do vetor para a sequencia de bit correspondente
+                for (int i = 0; i < tamanho - 1; i++)
+                {
+                    aux->codigo[i] = v[i]; //copiando o vetor
+                }
+                aux->bit = tamanho - 1; //Guardando o tamanho do vetor de bits
+                free(node);
+                return;
+            }
+
+            if (node->caracter == '+')
+            { //se o caracter nao for usado no arquivo
+                free(node);
+                return;
+            }
+        }
     }
+    //free(v);
+    return;
+}
+
+void exibirCaracteres(Queue *queue)
+{
+    if (!queue || !queue->first)
+        printf("Nao possui nenhum caracter ou a fila é nula");
     else
     {
-        int find = 0;
-
-        if (raiz->left)
+        NodeHuff *aux = queue->first;
+        while (aux != NULL)
         {
-            putc('0', saida);
-            find = geraCodigo(saida, raiz->left, c);
+            printf("%c [%d]: ", aux->caracter, aux->freq);
+            for (int i = 0; i < aux->bit; i++)
+            {
+                printf("%d", aux->codigo[i]);
+            }
+            printf("\n");
+            aux = aux->next;
         }
-
-        if (find == 0 && raiz->right)
-        {
-            putc('1', saida);
-            find = geraCodigo(saida, raiz->right, c);
-        }
-
-        if (find == 0)
-        {
-            putc('\0', saida);
-        }
-        return find;
     }
 }
 
-void comprimir(FILE *entrada, Queue *queue, FILE *saida)
+void comprimir(FILE *entrada, Queue *queue, Queue *queue2, FILE *saida)
 {
     unsigned vetorC[256] = {0};
+    int tamanho = 1;                               //contador pra saber quanto de memória reallocar
+    int *v = (int *)malloc(tamanho * sizeof(int)); //vetor usado na função define código para guardar o percurso até o caractere
 
     lerArquivo(entrada, vetorC);
 
-    queue = buildQueue(queue, vetorC);
-
+    queue = buildQueue(queue, vetorC); //Essa queue vai ser a que vai ser usada para montar a árvore com os nós
     queue = buildTree(queue);
 
-    unsigned char aux;
+    queue2 = buildQueue(queue2, vetorC); //Essa queue vai servir apenas como fila, para guardar a sequencia de bit que o caracter vai ter
 
-    saida = fopen("saida.txt", "wb");
-    if (!saida)
-    {
-        printf("Erro ao ler arquivo!\n");
-        fclose(saida);
-        exit(1);
-    }
-    else
-    {
-        printf("Arquivo lido com sucesso!\n\n");
-    }
+    printTree(queue->first, heightAvl(queue->first));
 
-    while (fscanf(entrada, "%c", &aux) != EOF)
-    {
-        geraCodigo(saida, queue->first, aux);
-    }
-    rewind(entrada); //aponta o indicador para o começo do arquivo
-    fclose(saida);
+    defineCodigo(queue, queue->first, queue2->first, tamanho, v);
+
+    printQueue(queue2);
+    printf("Terminou de ler os codigos\n");
+
+    exibirCaracteres(queue2);
 }
