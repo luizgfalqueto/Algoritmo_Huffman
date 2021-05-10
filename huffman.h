@@ -45,4 +45,12 @@ void defineCodigo(Queue *queue, NodeHuff *node, NodeHuff *node2, int tamanho, in
 
 void exibirCaracteres(Queue *queue);
 
+int getSizeCompressedText(Queue *queue);
+
+void escreveCaractere(Queue *queue, char c, int *contador, char *vetor);
+
+void destroyTree(Queue *queue);
+
+void auxDestroyTree(NodeHuff *node);
+
 #endif //HUFFMAN_H

@@ -52,14 +52,14 @@ int isEmptyQueue(Queue *queue)
     }
 }
 
-int heightAvl(NodeHuff *raiz)
+int heightTree(NodeHuff *raiz)
 {
     if (!raiz)
         return -1; //-1 para compensar a contagem da queue
     int tam_esq, tam_dir;
 
-    tam_esq = 1 + heightAvl(raiz->left);
-    tam_dir = 1 + heightAvl(raiz->right);
+    tam_esq = 1 + heightTree(raiz->left);
+    tam_dir = 1 + heightTree(raiz->right);
 
     if (tam_dir > tam_esq)
         return tam_dir;
@@ -159,7 +159,7 @@ void printQueue(Queue *queue)
 
 /*Função responsável por realizar a leitura de todos os caracteres de um arquivo
 Recebe como parâmetros de entrada o ponteiro pra um arquivo e um ponteiro para um vetor unsigned*/
-void lerArquivo(FILE *file, unsigned *vetor)
+void getFrequencyByte(FILE *file, unsigned *vetor)
 {
     unsigned char aux;
 
@@ -228,50 +228,6 @@ void printTree(NodeHuff *raiz, int nivel)
     }
 }
 
-void defineCodigo(Queue *queue, NodeHuff *node, NodeHuff *node2, int tamanho, int *v)
-{
-    if (queue->first != NULL)
-    { //se a árvore nao for vazia
-        if (node->left)
-        { //se tiver filho a esquerda, chama de forma recursiva passando o proximo no a esquerda
-            v[tamanho - 1] = 0;
-            defineCodigo(queue, node->left, node2, tamanho + 1, v);
-        }
-        if (node->right)
-        { //se tiver filho a direita, chama de forma recursiva passando o proximo no a direita
-            v[tamanho - 1] = 1;
-            defineCodigo(queue, node->right, node2, tamanho + 1, v);
-        }
-        else
-        { //caso seja um nó folha
-            if (node->caracter != '+')
-            { //se o nó for um caracter usado no arquivo
-                NodeHuff *aux = node2;
-                while (aux->next != NULL && node->caracter != aux->caracter)
-                { //Encontrando os caracteres correspondentes da arvore e da fila
-                    aux = aux->next;
-                }
-                aux->codigo = (int *)malloc(tamanho * sizeof(int)); //Alocando espaço do vetor para a sequencia de bit correspondente
-                for (int i = 0; i < tamanho - 1; i++)
-                {
-                    aux->codigo[i] = v[i]; //copiando o vetor
-                }
-                aux->bit = tamanho - 1; //Guardando o tamanho do vetor de bits
-                free(node);
-                return;
-            }
-
-            if (node->caracter == '+')
-            { //se o caracter nao for usado no arquivo
-                free(node);
-                return;
-            }
-        }
-    }
-    //free(v);
-    return;
-}
-
 void exibirCaracteres(Queue *queue)
 {
     if (!queue || !queue->first)
@@ -292,25 +248,225 @@ void exibirCaracteres(Queue *queue)
     }
 }
 
-void comprimir(FILE *entrada, Queue *queue, Queue *queue2, FILE *saida)
+int pegaCodigo(NodeHuff *n, unsigned char c, char *buffer, int tamanho)
 {
+
+    // Caso base da recursão:
+    // Se o nó for folha e o seu valor for o buscado, colocar o caractere terminal no buffer e encerrar
+
+    if (!(n->left || n->right) && n->caracter == c)
+    {
+        buffer[tamanho] = '\0';
+        return 1;
+    }
+    else
+    {
+        int encontrado = 0;
+
+        // Se existir um nó à esquerda
+        if (n->left)
+        {
+            // Adicione '0' no bucket do buffer correspondente ao 'tamanho' nodeAtual
+            buffer[tamanho] = '0';
+
+            // fazer recursão no nó esquerdo
+            encontrado = pegaCodigo(n->left, c, buffer, tamanho + 1);
+        }
+
+        if (!encontrado && n->right)
+        {
+            buffer[tamanho] = '1';
+            encontrado = pegaCodigo(n->right, c, buffer, tamanho + 1);
+        }
+        if (!encontrado)
+        {
+            buffer[tamanho] = '\0';
+        }
+        return encontrado;
+    }
+}
+
+void compress(const char *arquivoEntrada, const char *arquivoSaida)
+{
+    printf("Entrou...\n");
+    FILE *entrada = fopen(arquivoEntrada, "rb");
+    FILE *saida = fopen(arquivoSaida, "wb");
+
+    if (!entrada || !saida)
+    {
+        if (!entrada)
+        {
+            printf("Erro ao ler arquivo de entrada!\n");
+            fclose(entrada);
+            exit(1);
+        }
+        else
+        {
+            printf("Erro ao ler arquivo de saida!\n");
+            fclose(saida);
+            exit(1);
+        }
+    }
+
     unsigned vetorC[256] = {0};
-    int tamanho = 1;                               //contador pra saber quanto de memória reallocar
-    int *v = (int *)malloc(tamanho * sizeof(int)); //vetor usado na função define código para guardar o percurso até o caractere
+    getFrequencyByte(entrada, vetorC);
 
-    lerArquivo(entrada, vetorC);
+    Queue *tree = createQueue();
+    tree = buildQueue(tree, vetorC);
+    tree = buildTree(tree);
 
-    queue = buildQueue(queue, vetorC); //Essa queue vai ser a que vai ser usada para montar a árvore com os nós
-    queue = buildTree(queue);
+    printTree(tree->first, heightTree(tree->first));
 
-    queue2 = buildQueue(queue2, vetorC); //Essa queue vai servir apenas como fila, para guardar a sequencia de bit que o caracter vai ter
+    // for (int i = 0; i < 256; i++)
+    // {
+    //     if (vetorC[i] != 0)
+    //     {
+    //         printf("%c >> %d\n", (unsigned char)i, vetorC[i]);
+    //     }
+    // }
 
-    printTree(queue->first, heightAvl(queue->first));
+    fwrite(vetorC, 256, sizeof(vetorC[0]), saida);
 
-    defineCodigo(queue, queue->first, queue2->first, tamanho, v);
+    fseek(saida, sizeof(unsigned int), SEEK_CUR);
 
-    printQueue(queue2);
-    printf("Terminou de ler os codigos\n");
+    unsigned char c;
+    unsigned tam = 0;
+    unsigned char aux = 0;
 
-    exibirCaracteres(queue2);
+    while (fread(&c, 1, 1, entrada) >= 1)
+    {
+        // Cria um buffer vazio
+        char buffer[1024] = {0};
+
+        // Busca o código começando no nó 'raiz', utilizando o byte salvo em 'c', preenchendo 'buffer', desde o bucket deste último
+        pegaCodigo(tree->first, c, buffer, 0);
+
+        // printf("Imprimindo o buffer\n");
+
+        // for (int i = 0; i < 1024; i++)
+        // {
+        //     printf("%c ", buffer[i]);
+        // }
+        // printf("\n");
+
+        // Laço que percorre o buffer
+        for (char *i = buffer; *i; i++)
+        {
+            // Se o caractere na posição nodeAtual for '1'
+            if (*i == '1')
+            {
+                // 2 elevado ao resto da divisão de 'tamanho' por 8
+                // que é o mesmo que jogar um '1' na posição denotada por 'tamanho % 8'
+                //aux = aux + pow(2, tamanho % 8);
+                aux = aux | (1 << (tam % 8));
+            }
+
+            tam++;
+
+            // Já formou um byte, é hora de escrevê-lo no arquivo
+            if (tam % 8 == 0)
+            {
+                fwrite(&aux, 1, 1, saida);
+                // Zera a variável auxiliar
+                aux = 0;
+            }
+        }
+    }
+
+    //Escreve no arquivo o que sobrou
+    fwrite(&aux, 1, 1, saida);
+
+    // Move o ponteiro do stream para 256 vezes o tamanho de um unsigned int, a partir do início dele (SEEK_SET)
+    fseek(saida, 256 * sizeof(unsigned int), SEEK_SET);
+
+    // Salva o valor da variável 'tamanho' no arquivo saida
+    fwrite(&tam, 1, sizeof(unsigned), saida);
+
+    // Calcula tamanho dos arquivos
+    fseek(entrada, 0L, SEEK_END);
+    double tamanhoEntrada = ftell(entrada);
+
+    fseek(saida, 0L, SEEK_END);
+    double tamanhoSaida = ftell(saida);
+
+    printf("Arquivo de entrada: %s (%g bytes)\nArquivo de saida: %s (%g bytes)\n", arquivoEntrada, tamanhoEntrada / 1000, arquivoSaida, tamanhoSaida / 1000);
+    printf("Taxa de compressao: %d%%\n", (int)((100 * tamanhoSaida) / tamanhoEntrada));
+
+    fclose(saida);
+    fclose(entrada);
+}
+
+int geraBit(FILE *entrada, int posicao, unsigned *aux)
+{
+    // É hora de ler um bit?
+    (posicao % 8 == 0) ? fread(aux, 1, 1, entrada) : NULL == NULL;
+
+    // Exclamação dupla converte para '1' (inteiro) se não for 0. Caso contrário, deixa como está (0)
+    // Joga '1' na casa binária 'posicao' e vê se "bate" com o byte salvo em *aux do momento
+    // Isso é usado para percorrer a árvore (esquerda e direita)
+    return !!((*aux) & (1 << (posicao % 8)));
+}
+
+void decompress(const char *arquivoComprimido, const char *arquivoDescomprimido)
+{
+
+    unsigned listaBytes[256] = {0};
+
+    // Abre arquivo do parâmetro arquivoEntrada no modo leitura de binário
+    FILE *entrada = fopen(arquivoComprimido, "rb");
+
+    // Abre arquivo do parâmetro arquivoSaida no modo escrita de binário
+    FILE *saida = fopen(arquivoDescomprimido, "wb");
+
+    if (!entrada || !saida)
+    {
+        if (!entrada)
+        {
+            printf("Erro ao ler arquivo de entrada!\n");
+            fclose(entrada);
+            exit(1);
+        }
+        else
+        {
+            printf("Erro ao ler arquivo de saida!\n");
+            fclose(saida);
+            exit(1);
+        }
+    }
+
+    // Lê a lista de frequência que encontra-se nos primeiros 256 bytes do arquivo
+    fread(listaBytes, 256, sizeof(listaBytes[0]), entrada);
+
+    // Constrói árvore
+    Queue *tree = createQueue();
+    tree = buildQueue(tree, listaBytes);
+    tree = buildTree(tree);
+
+    // Lê o valor dessa posição do stream para dentro da variável tamanho
+    unsigned tamanho;
+    fread(&tamanho, 1, sizeof(tamanho), entrada);
+
+    unsigned posicao = 0;
+    unsigned aux = 0;
+
+    // Enquanto a posicao for menor que tamanho
+    while (posicao < tamanho)
+    {
+        // Salvando o nodeArvore que encontramos
+        NodeHuff *nodeAtual = tree->first;
+
+        // Enquanto nodeAtual não for folha
+        while (nodeAtual->left || nodeAtual->right)
+        {
+            nodeAtual = geraBit(entrada, posicao++, &aux) ? nodeAtual->right : nodeAtual->left;
+        }
+
+        fwrite(&(nodeAtual->caracter), 1, 1, saida);
+    }
+
+    // printf("Arquivo de entrada: %s (%g bytes)\nArquivo de saida: %s (%g bytes)\nTempo gasto: %gs\n", arquivoEntrada, tamanhoEntrada / 1000, arquivoSaida, tamanhoSaida / 1000, tempoGasto);
+    // printf("Taxa de descompressao: %d%%\n", (int)((100 * tamanhoSaida) / tamanhoEntrada));
+
+    fclose(saida);
+    fclose(entrada);
 }
