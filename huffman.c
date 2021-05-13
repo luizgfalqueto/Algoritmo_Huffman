@@ -1,20 +1,28 @@
+/*
+TRABALHO DE IMPLEMENTACAO DO CÓDIGO DE HUFFMAN (COMPRESSÃO E DESCOMPRESSÃO DE ARQUIVOS)
+AUTOR: LUIZ GUSTAVO FALQUETO e ERIC RABELO
+DATA CRIACAO: 12/05/2021
+ARQUIVO: huffman.c
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
+#include <time.h>
 #include "huffman.h"
 
 /*Função responsável por criar um nó
-Recebe como parâmetros de entrada um char e uma frequência
+Recebe como parâmetros de entrada um char e uma frequência e um inteiro para representar se é pai
 Retorna o nó criado*/
-NodeHuff *createNodeHuff(char c, int frequencia)
+NodeHuff *createNodeHuff(char c, int frequencia, int pai)
 {
     NodeHuff *ptr;
-    if (ptr = (NodeHuff *)malloc(sizeof(NodeHuff))) //Aloca espaço na memória para o nó
+    if ((ptr = (NodeHuff *)malloc(sizeof(NodeHuff)))) //Aloca espaço na memória para o nó
     {
         ptr->caracter = c;                         //ptr->caracter recebe o char passado como parâmetro
         ptr->freq = frequencia;                    //ptr->freq recebe a frequência passada como parâmetro
         ptr->left = ptr->right = ptr->next = NULL; //left, right e next são apontados para NULL
+        ptr->pai = pai;                            //ptr->pai indica se ele é um nó pai (soma do esq com dir) ou não
         return ptr;                                //o nó é retornado
     }
     else             //Caso ocorra erro na alocação
@@ -52,18 +60,21 @@ int isEmptyQueue(Queue *queue)
     }
 }
 
+/*Funcao responsável calcular a altura de uma árvore
+Recebe como parâmetro de entrada o ponteiro para um nó raiz
+Retorna a altura da árvore*/
 int heightTree(NodeHuff *raiz)
 {
-    if (!raiz)
+    if (!raiz)     //Se a raíz for nula
         return -1; //-1 para compensar a contagem da queue
     int tam_esq, tam_dir;
 
-    tam_esq = 1 + heightTree(raiz->left);
-    tam_dir = 1 + heightTree(raiz->right);
+    tam_esq = 1 + heightTree(raiz->left);  //tamanho pela esquerda recebe 1 + o resultado da chamada recursiva pela esquerda
+    tam_dir = 1 + heightTree(raiz->right); //tamanho pela esquerda recebe 1 + o resultado da chamada recursiva pela direita
 
-    if (tam_dir > tam_esq)
+    if (tam_dir > tam_esq) //Se o tamanho pela direita for maior
         return tam_dir;
-    else
+    else //Se o tamanho pela esquerda for maior
         return tam_esq;
 }
 
@@ -159,13 +170,13 @@ void printQueue(Queue *queue)
 
 /*Função responsável por realizar a leitura de todos os caracteres de um arquivo
 Recebe como parâmetros de entrada o ponteiro pra um arquivo e um ponteiro para um vetor unsigned*/
-void getFrequencyByte(FILE *file, unsigned *vetor)
+void geraFrequencia(FILE *file, unsigned *vetor)
 {
     unsigned char aux;
 
-    while (fscanf(file, "%c", &aux) != EOF)
+    while (fread(&aux, 1, 1, file) >= 1) //Realiza a leitura de caractere por caractere do arquivo
     {
-        vetor[(unsigned)aux]++;
+        vetor[(unsigned char)aux]++;
     }
     rewind(file); //aponta o indicador para o começo do arquivo
 }
@@ -181,8 +192,8 @@ Queue *buildQueue(Queue *queue, unsigned *vetor)
     {
         if (vetor[i] != 0) //Se o carácter foi usado alguma vez
         {
-            novo = createNodeHuff(i, vetor[i]); //O nó é criado armazenando seu caracter e sua frequencia
-            pushQueue(queue, novo);             //o nó é inserido na fila ordenadamente
+            novo = createNodeHuff(i, vetor[i], 0); //O nó é criado armazenando seu caracter e sua frequencia
+            pushQueue(queue, novo);                //o nó é inserido na fila ordenadamente
         }
     }
     return queue; //Retorna a fila ordenada
@@ -191,27 +202,31 @@ Queue *buildQueue(Queue *queue, unsigned *vetor)
 /*Função responsável por criar a árvore de Huffman
 Recebe como parâmetros de entrada uma lista já ordenada
 Retorna uma fila contendo um único nó que é a árvore de Huffman*/
-Queue *buildTree(Queue *queue)
+Queue *buildTree(Queue *tree)
 {
-    if (queue->first == NULL || queue->first->next == NULL) //Se a fila possuir apenas 1 elemento ou for vazia
+    if (tree->first == NULL || tree->first->next == NULL) //Se a fila possuir apenas 1 elemento ou for vazia
     {
         printf("A fila nao tem no minimo 2 elementos para criar a arvore de Huffman");
-        return queue; // a fila é retornada
+        return tree; // a fila é retornada
     }
 
     NodeHuff *left, *right, *dad;
-    while (queue->sizeQueue > 1) //Enquanto ouver mais de 1 elemento na fila
+    while (tree->sizeQueue > 1) //Enquanto ouver mais de 1 elemento na fila
     {
-        left = popQueue(queue);                              //Recebe o primeiro elemento da fila
-        right = popQueue(queue);                             //Recebe o segundo elemento da fila (que na verdade se tornou o primeiro, pois a função pop retira o nó da fila)
-        dad = createNodeHuff('+', left->freq + right->freq); //é criado um nó pai que terá a soma das frequencias de left e right
-        dad->left = left;                                    //dad->left aponta para left
-        dad->right = right;                                  //dad->right aponta para right
-        pushQueue(queue, dad);                               //O nó pai é inserido na fila novamente
+        left = popQueue(tree);                                  //Recebe o primeiro elemento da fila
+        right = popQueue(tree);                                 //Recebe o segundo elemento da fila (que na verdade
+                                                                //se tornou o primeiro, pois a função pop retira o nó da fila)
+        dad = createNodeHuff('+', left->freq + right->freq, 1); //é criado um nó pai que terá a soma das frequencias
+                                                                //de left e right
+        dad->left = left;                                       //dad->left aponta para left
+        dad->right = right;                                     //dad->right aponta para right
+        pushQueue(tree, dad);                                   //O nó pai é inserido na fila novamente
     }
-    return queue; //É retornada a fila contendo um único nó que é a árvore de Huffman
+    return tree; //É retornada a fila contendo um único nó que é a árvore de Huffman
 }
 
+/*Função responsável por imprimir a árvore de Huffman
+Recebe como parâmetros de entrada a raíz da árvore e a sua altura*/
 void printTree(NodeHuff *raiz, int nivel)
 {
     int i;
@@ -220,7 +235,7 @@ void printTree(NodeHuff *raiz, int nivel)
         printTree(raiz->right, nivel + 1);
         for (i = 0; i < nivel; i++)
             printf("\t");
-        if (raiz->caracter != '+')
+        if (raiz->pai == 0)
             printf("[%c | %d]\n", raiz->caracter, raiz->freq); //Imprime o caractere e a frequência do nó
         else
             printf("[%d]\n", raiz->freq);
@@ -228,245 +243,338 @@ void printTree(NodeHuff *raiz, int nivel)
     }
 }
 
-void exibirCaracteres(Queue *queue)
+/*Função responsável por exibir os caracteres, ocorrencias e sequencia de bits de um arquivo
+Recebe como parâmetros de entrada o nome do arquivo de entrada que deseja ler*/
+void exibirCaracteres(const char *arquivoentrada)
 {
-    if (!queue || !queue->first)
+    //Realizando a abertura do arquivo de entrada
+    FILE *entrada;
+    entrada = fopen(arquivoentrada, "r");
+
+    if (!entrada)
+    {
+        printf("Erro ao ler arquivo!\n");
+        fclose(entrada);
+        exit(1);
+    }
+    else
+    {
+        printf("Arquivo lido com sucesso!\n\n");
+    }
+
+    Queue *tree = createQueue();  //Essa queue vai ser a que vai ser usada para montar a árvore com os nós
+    Queue *queue = createQueue(); //Essa queue vai servir apenas como fila, para guardar a sequencia de bit que
+                                  //o caracter vai ter
+
+    unsigned vetorC[256] = {0};      //Vetor que vai armazenar os caracteres e frequências
+    geraFrequencia(entrada, vetorC); //Função que vai ler o arquivo de entrada e armazenar os caracteres e
+                                     //frequências no vetor
+
+    tree = buildQueue(tree, vetorC);   //Essa queue vai ser a que vai ser usada para montar a árvore com os nós
+    tree = buildTree(tree);            //Constroi arvore com os nós da queue
+    queue = buildQueue(queue, vetorC); //Essa queue vai servir apenas como fila, para guardar a sequencia de
+                                       //bit que o caracter vai ter
+
+    int tamanhovetor = 1;                                                //contador pra saber qual a posição do vetor salvar
+    int *v = (int *)malloc((heightTree(tree->first) - 1) * sizeof(int)); //vetor usado na função define código para
+                                                                         //guardar o percurso até o caractere
+    geraCodigo(tree->first, queue->first, tamanhovetor, v);              //Define a sequencia de bits para cada caractere
+
+    if (!queue || !queue->first) //Se a fila for vazia ou nula
         printf("Nao possui nenhum caracter ou a fila é nula");
     else
     {
-        NodeHuff *aux = queue->first;
-        while (aux != NULL)
+        NodeHuff *aux = queue->first; //Ponteiro para um nó aponta para a raíz da fila
+        while (aux != NULL)           //Enquanto o ponteiro não for nulo
         {
-            printf("%c [%d]: ", aux->caracter, aux->freq);
-            for (int i = 0; i < aux->bit; i++)
+            printf("%c [%d]: ", aux->caracter, aux->freq); //Imprime o caractere e a frequencia
+            for (int i = 0; i < aux->bit; i++)             //Laço para imprimir os valores contidos no vetor que armazena
+                                                           //a sequencia de bits
             {
-                printf("%d", aux->codigo[i]);
+                printf("%d", aux->codigo[i]); //Imprime os valores correspondentes dos bits
             }
             printf("\n");
-            aux = aux->next;
+            aux = aux->next; //Ponteiro auxiliar aponta para o próximo
         }
     }
+    free(v);             //Libera espaço da memória do vetor alocado anteriormente
+    destroyQueue(queue); //Libera espaço de memória da queue usada para definir os codigos
+    free(tree);          //Libera espaço de memoria para a queue usada para armazenar os codigos de bits
 }
 
-int pegaCodigo(NodeHuff *n, unsigned char c, char *buffer, int tamanho)
+/*Função responsável por definir a sequencia de bits de cada caractere
+Recebe como parâmetros de entrada o ponteiro pra uma fila, dois ponteiros para nós, uma variavel que guarda o tamanho e um vetor de inteiros*/
+void geraCodigo(NodeHuff *node, NodeHuff *node2, int tamanho, int *v)
 {
-
-    // Caso base da recursão:
-    // Se o nó for folha e o seu valor for o buscado, colocar o caractere terminal no buffer e encerrar
-
-    if (!(n->left || n->right) && n->caracter == c)
+    if (!node) //se a árvore for vazia
+        return;
+    if (node->left) //se tiver filho a esquerda, chama de forma recursiva passando o proximo no a esquerda
     {
-        buffer[tamanho] = '\0';
-        return 1;
+        v[tamanho - 1] = 0; //Recebe 0 na posição [tamanho-1] do vetor
+        geraCodigo(node->left, node2, tamanho + 1, v);
     }
+    if (node->right) //se tiver filho a direita, chama de forma recursiva passando o proximo no a direita
+    {
+        v[tamanho - 1] = 1; //Recebe 1 na posição [tamanho-1] do vetor
+        geraCodigo(node->right, node2, tamanho + 1, v);
+    }
+    if (node->pai == 0) //se o nó for um caracter usado no arquivo
+    {
+        NodeHuff *aux = node2;                                       //Ponteiro para um nó auxiliar
+        while (aux->next != NULL && node->caracter != aux->caracter) //Encontrando os caracteres correspondentes da arvore e da fila
+        {
+            aux = aux->next; //Ponteiro auxiliar aponta para o próximo
+        }
+        aux->codigo = (int *)malloc(tamanho * sizeof(int)); //Alocando espaço do vetor para a sequencia de bit correspondente
+        for (int i = 0; i < tamanho - 1; i++)               //Laço responsável for percorrer o vetor v copiando as informações para o vetor de código
+        {
+            aux->codigo[i] = v[i]; //copiando o vetor
+        }
+        aux->bit = tamanho - 1; //Guardando o tamanho do vetor de bits
+    }
+    free(node);
+    return;
+}
+
+/*Função responsável por calcular quantos bits são usados para comprimir o arquivo
+Recebe como parâmetros de entrada o ponteiro para uma fila
+Retorna o tamanho de bits*/
+unsigned int getSizeCompressedText(Queue *queue)
+{
+    unsigned int size = 0;       //Variável que guarda a quantidade de bits
+    if (!queue || !queue->first) //se a fila for vazia ou nula
+        printf("Nao possui nenhum caracter ou a fila é nula");
     else
     {
-        int encontrado = 0;
-
-        // Se existir um nó à esquerda
-        if (n->left)
+        NodeHuff *aux = queue->first; //Ponteiro para um nó aponta para a raíz da fila
+        while (aux != NULL)           //Enquanto o ponteiro não for nulo
         {
-            // Adicione '0' no bucket do buffer correspondente ao 'tamanho' nodeAtual
-            buffer[tamanho] = '0';
-
-            // fazer recursão no nó esquerdo
-            encontrado = pegaCodigo(n->left, c, buffer, tamanho + 1);
+            size += aux->bit * aux->freq; //Size recebe a quantidade de bits de um caracter multiplicado pela freqûencia em que ele ocorre
+            aux = aux->next;              //Ponteiro auxiliar aponta para o próximo
         }
-
-        if (!encontrado && n->right)
-        {
-            buffer[tamanho] = '1';
-            encontrado = pegaCodigo(n->right, c, buffer, tamanho + 1);
-        }
-        if (!encontrado)
-        {
-            buffer[tamanho] = '\0';
-        }
-        return encontrado;
     }
+    return size; //Retorna a quantidade de bits
 }
 
-void compress(const char *arquivoEntrada, const char *arquivoSaida)
+/*Função responsável por gerar o bit para busca do caractere na árvore
+Recebe como parâmetros de entrada o ponteiro para um arquivo, um inteiro que grarda a posição e o ponteiro para um unsigned char
+Retorna 1 ou 0*/
+int geraBit(FILE *entrada, int posicao, unsigned char *aux)
 {
-    printf("Entrou...\n");
-    FILE *entrada = fopen(arquivoEntrada, "rb");
-    FILE *saida = fopen(arquivoSaida, "wb");
+    if (posicao % 8 == 0)
+        fread(aux, 1, 1, entrada);            /*Se o resto da divisao de posição por 8 for 0, realiza a leitura de um bit
+    Se o resultado for 0, retorna normal, caso nao for, retorna 1. 
+    Através disso, é percorrida a árvore para saber qual caractere corresponde a sequencia de bit*/
+    return !!((*aux) & (1 << (posicao % 8))); //Realiza o processo de movimentar o auxiliar no byte
+}
+
+/*Função responsável por realizar a leitura de um arquivo e comprimí-lo usando o método de Huffman
+Recebe como parâmetros de entrada o nome do arquivo que deseja ler e o nome do arquivo que deseja salvar*/
+void comprimir(const char *arquivoentrada, const char *arquivosaida)
+{
+    //Realizando a gravação do tempo gasto na operação
+    clock_t inicio, final;
+    double tempoGasto;
+    inicio = clock();
+
+    //Realizando a abertura dos arquivos de entrada e saída
+    FILE *entrada, *saida;
+    entrada = fopen(arquivoentrada, "r");
+    saida = fopen(arquivosaida, "wb");
 
     if (!entrada || !saida)
     {
-        if (!entrada)
-        {
-            printf("Erro ao ler arquivo de entrada!\n");
-            fclose(entrada);
-            exit(1);
-        }
-        else
-        {
-            printf("Erro ao ler arquivo de saida!\n");
-            fclose(saida);
-            exit(1);
-        }
+        printf("Erro ao ler arquivo!\n");
+        fclose(entrada);
+        exit(1);
     }
-
-    unsigned vetorC[256] = {0};
-    getFrequencyByte(entrada, vetorC);
-
-    Queue *tree = createQueue();
-    tree = buildQueue(tree, vetorC);
-    tree = buildTree(tree);
-
-    printTree(tree->first, heightTree(tree->first));
-
-    // for (int i = 0; i < 256; i++)
-    // {
-    //     if (vetorC[i] != 0)
-    //     {
-    //         printf("%c >> %d\n", (unsigned char)i, vetorC[i]);
-    //     }
-    // }
-
-    fwrite(vetorC, 256, sizeof(vetorC[0]), saida);
-
-    fseek(saida, sizeof(unsigned int), SEEK_CUR);
-
-    unsigned char c;
-    unsigned tam = 0;
-    unsigned char aux = 0;
-
-    while (fread(&c, 1, 1, entrada) >= 1)
+    else
     {
-        // Cria um buffer vazio
-        char buffer[1024] = {0};
-
-        // Busca o código começando no nó 'raiz', utilizando o byte salvo em 'c', preenchendo 'buffer', desde o bucket deste último
-        pegaCodigo(tree->first, c, buffer, 0);
-
-        // printf("Imprimindo o buffer\n");
-
-        // for (int i = 0; i < 1024; i++)
-        // {
-        //     printf("%c ", buffer[i]);
-        // }
-        // printf("\n");
-
-        // Laço que percorre o buffer
-        for (char *i = buffer; *i; i++)
-        {
-            // Se o caractere na posição nodeAtual for '1'
-            if (*i == '1')
-            {
-                // 2 elevado ao resto da divisão de 'tamanho' por 8
-                // que é o mesmo que jogar um '1' na posição denotada por 'tamanho % 8'
-                //aux = aux + pow(2, tamanho % 8);
-                aux = aux | (1 << (tam % 8));
-            }
-
-            tam++;
-
-            // Já formou um byte, é hora de escrevê-lo no arquivo
-            if (tam % 8 == 0)
-            {
-                fwrite(&aux, 1, 1, saida);
-                // Zera a variável auxiliar
-                aux = 0;
-            }
-        }
+        printf("Arquivo lido com sucesso!\n\n");
     }
 
-    //Escreve no arquivo o que sobrou
-    fwrite(&aux, 1, 1, saida);
+    Queue *tree = createQueue();  //Essa queue vai ser a que vai ser usada para montar a árvore com os nós
+    Queue *queue = createQueue(); //Essa queue vai servir apenas como fila, para guardar a sequencia de bit que o caracter vai ter
 
-    // Move o ponteiro do stream para 256 vezes o tamanho de um unsigned int, a partir do início dele (SEEK_SET)
-    fseek(saida, 256 * sizeof(unsigned int), SEEK_SET);
+    unsigned vetorC[256] = {0};                    //Vetor que vai armazenar os caracteres e frequências
+    geraFrequencia(entrada, vetorC);               //Função que vai ler o arquivo de entrada e armazenar os caracteres e frequências no vetor
+    fwrite(vetorC, 256, sizeof(vetorC[0]), saida); //Grava o vetor de caracteres e frequências no arquivo de saída
+    fseek(saida, sizeof(unsigned int), SEEK_CUR);  //Move o ponteiro do stream para o tamanho de um unsigned int á frente, pois posteriormente,
+                                                   //será salvo o tamanho de bits
 
-    // Salva o valor da variável 'tamanho' no arquivo saida
-    fwrite(&tam, 1, sizeof(unsigned), saida);
+    tree = buildQueue(tree, vetorC);   //Essa queue vai ser a que vai ser usada para montar a árvore com os nós
+    tree = buildTree(tree);            //Constroi arvore com os nós da queue
+    queue = buildQueue(queue, vetorC); //Essa queue vai servir apenas como fila, para guardar a sequencia de bit que o caracter vai ter
 
-    // Calcula tamanho dos arquivos
+    int tamanhovetor = 1;                                                //contador pra saber qual a posição do vetor salvar
+    int *v = (int *)malloc((heightTree(tree->first) - 1) * sizeof(int)); //vetor usado na função define código para guardar o percurso até o caractere
+    geraCodigo(tree->first, queue->first, tamanhovetor, v);              //Define a sequencia de bits para cada caractere
+
+    //Criando o vetor de saída do arqeuivo
+    unsigned char aux = 0, c;
+    unsigned tam = 0;
+    NodeHuff *aux2;
+
+    while (fread(&c, 1, 1, entrada) >= 1) //Enquanto houver texto a ser lido
+    {
+        aux2 = queue->first;
+        while (aux2 != NULL) //Enquanto aux2 não for nulo
+        {
+            if (aux2->caracter == c) //Se os caracteres forem iguais
+            {
+                for (int j = 0; j < aux2->bit; j++) //Laço que percorre o vetor de códigos de aux2 movendo os bits para a posição necessária
+                {
+                    if (aux2->codigo[j] == 1) //Se o código for igual a 1, é necessário movimentar. Caso seja 0 não.
+                    {
+                        aux = aux | (1 << (tam % 8)); //Realiza o processo de movimentar o auxiliar no byte
+                    }
+                    tam++; //Aumenta o tamanho
+
+                    //Se o resto da divisão de tam por 8 for 0, formou um byte, então salva no arquivo
+                    if (tam % 8 == 0)
+                    {
+                        fwrite(&aux, 1, 1, saida); //Grava o byte no arquivo de saída
+                        aux = 0;                   //Reseta a variável auxiliar
+                    }
+                }
+                break; //se ja realizou a gravação do caractere, passa pro próximo
+            }
+            aux2 = aux2->next; //aux2 recebe aux2->next
+        }
+    }
+    fwrite(&aux, 1, 1, saida); //Escreve no arquivo o que sobrou, caso nao tenha completado 1 byte
+
+    fseek(saida, 256 * sizeof(unsigned int), SEEK_SET); //Move o ponteiro de stream para a posição que foi pulada anteriormente
+    fwrite(&tam, 1, sizeof(unsigned), saida);           //Grava o tamanho de bits
+    printf("Arquivo comprimido!\n");
+
+    final = clock();
+    tempoGasto = (double)(final - inicio) / CLOCKS_PER_SEC; //Calcula o tempo gasto para realizar a operação
+
+    //Calcula o tamanho dos arquivos
     fseek(entrada, 0L, SEEK_END);
     double tamanhoEntrada = ftell(entrada);
 
     fseek(saida, 0L, SEEK_END);
     double tamanhoSaida = ftell(saida);
 
-    printf("Arquivo de entrada: %s (%g bytes)\nArquivo de saida: %s (%g bytes)\n", arquivoEntrada, tamanhoEntrada / 1000, arquivoSaida, tamanhoSaida / 1000);
+    printf("Arquivo de entrada: %s (%g bytes)\n", arquivoentrada, tamanhoEntrada / 1000);
+    printf("Arquivo de saida: %s (%g bytes)\n", arquivosaida, tamanhoSaida / 1000);
+    printf("Tempo gasto: %g segundos\n", tempoGasto);
     printf("Taxa de compressao: %d%%\n", (int)((100 * tamanhoSaida) / tamanhoEntrada));
 
-    fclose(saida);
-    fclose(entrada);
+    free(v);             //Libera espaço da memória do vetor alocado anteriormente
+    free(tree);          //Libera espaço de memória da queue usada para definir os codigos
+    destroyQueue(queue); //Libera espaço de memoria para a queue usada para armazenar os codigos de bits
+    fclose(entrada);     //Fecha o arquivo de entrada
+    fclose(saida);       //Fecha o arquivo de saída
 }
 
-int geraBit(FILE *entrada, int posicao, unsigned *aux)
+/*Função responsável por realizar a leitura de um arquivo comprimido e retornar a forma original
+Recebe como parâmetros de entrada o nome do arquivo que deseja ler e o nome do arquivo que deseja salvar*/
+void descomprimir(const char *arquivoentrada, const char *arquivosaida)
 {
-    // É hora de ler um bit?
-    (posicao % 8 == 0) ? fread(aux, 1, 1, entrada) : NULL == NULL;
+    //Realiza a gravação do tempo gasto na operação
+    clock_t inicio, final;
+    double tempoGasto;
+    inicio = clock();
 
-    // Exclamação dupla converte para '1' (inteiro) se não for 0. Caso contrário, deixa como está (0)
-    // Joga '1' na casa binária 'posicao' e vê se "bate" com o byte salvo em *aux do momento
-    // Isso é usado para percorrer a árvore (esquerda e direita)
-    return !!((*aux) & (1 << (posicao % 8)));
-}
-
-void decompress(const char *arquivoComprimido, const char *arquivoDescomprimido)
-{
-
-    unsigned listaBytes[256] = {0};
-
-    // Abre arquivo do parâmetro arquivoEntrada no modo leitura de binário
-    FILE *entrada = fopen(arquivoComprimido, "rb");
-
-    // Abre arquivo do parâmetro arquivoSaida no modo escrita de binário
-    FILE *saida = fopen(arquivoDescomprimido, "wb");
+    //Realiza a abertura dos arquivos de entrada e saída
+    FILE *entrada, *saida;
+    entrada = fopen(arquivoentrada, "rb");
+    saida = fopen(arquivosaida, "wb");
 
     if (!entrada || !saida)
     {
-        if (!entrada)
-        {
-            printf("Erro ao ler arquivo de entrada!\n");
-            fclose(entrada);
-            exit(1);
-        }
-        else
-        {
-            printf("Erro ao ler arquivo de saida!\n");
-            fclose(saida);
-            exit(1);
-        }
+        printf("Erro ao ler arquivo!\n");
+        fclose(entrada);
+        exit(1);
     }
-
-    // Lê a lista de frequência que encontra-se nos primeiros 256 bytes do arquivo
-    fread(listaBytes, 256, sizeof(listaBytes[0]), entrada);
-
-    // Constrói árvore
-    Queue *tree = createQueue();
-    tree = buildQueue(tree, listaBytes);
-    tree = buildTree(tree);
-
-    // Lê o valor dessa posição do stream para dentro da variável tamanho
-    unsigned tamanho;
-    fread(&tamanho, 1, sizeof(tamanho), entrada);
-
-    unsigned posicao = 0;
-    unsigned aux = 0;
-
-    // Enquanto a posicao for menor que tamanho
-    while (posicao < tamanho)
+    else
     {
-        // Salvando o nodeArvore que encontramos
-        NodeHuff *nodeAtual = tree->first;
+        printf("Arquivo lido com sucesso!\n\n");
+    }
+    unsigned vetorC[256] = {0};                     //Vetor que irá conter os caracteres e frequências
+    fread(vetorC, 256, sizeof(vetorC[0]), entrada); //Realiza a leitura do vetor guardado no arquivo
+    unsigned tamanho;                               //Variável que contém o numero de bits
+    fread(&tamanho, 1, sizeof(tamanho), entrada);   //Realiza a leitura da variável tamanho guardada no arquivo
 
-        // Enquanto nodeAtual não for folha
-        while (nodeAtual->left || nodeAtual->right)
+    Queue *tree = createQueue();     //Cria uma fila
+    tree = buildQueue(tree, vetorC); //Essa queue vai ser a que vai ser usada para montar a árvore com os nós
+    tree = buildTree(tree);          //Transforma a queue em uma árvore de Huffman
+
+    unsigned char aux = 0; //Variável auxiliar
+    unsigned posicao = 0;  //Variável contadora
+    NodeHuff *aux2;        //Cria um ponteiro para nó do tipo NodeHuff
+
+    while (posicao < tamanho) //Enquanto a posição for menor que o tamanho de bits
+    {
+        aux2 = tree->first; //aux2 recebe a raiz da árvore
+
+        while (aux2->left || aux2->right) //Enquanto o nó atual tiver filhos
         {
-            nodeAtual = geraBit(entrada, posicao++, &aux) ? nodeAtual->right : nodeAtual->left;
+            if (geraBit(entrada, posicao++, &aux) == 1)
+                aux2 = aux2->right; //Se a função geraBit retorna 1, aux2 anda pra direita
+            else
+                aux2 = aux2->left; //Senão, aux2 anda pra esquerda
         }
 
-        fwrite(&(nodeAtual->caracter), 1, 1, saida);
+        fwrite(&(aux2->caracter), 1, 1, saida); //Se o nó for folha grava o caracter contido nele
     }
+    printf("Arquivo Descomprimido!\n");
 
-    // printf("Arquivo de entrada: %s (%g bytes)\nArquivo de saida: %s (%g bytes)\nTempo gasto: %gs\n", arquivoEntrada, tamanhoEntrada / 1000, arquivoSaida, tamanhoSaida / 1000, tempoGasto);
-    // printf("Taxa de descompressao: %d%%\n", (int)((100 * tamanhoSaida) / tamanhoEntrada));
+    final = clock();
+    tempoGasto = (double)(final - inicio) / CLOCKS_PER_SEC; //Calcula o tempo gasto para realizar a operação
 
-    fclose(saida);
-    fclose(entrada);
+    //Calcula o tamanho dos arquivos
+    fseek(entrada, 0L, SEEK_END);
+    double tamanhoEntrada = ftell(entrada);
+
+    fseek(saida, 0L, SEEK_END);
+    double tamanhoSaida = ftell(saida);
+
+    printf("Arquivo de entrada: %s (%g bytes)\n", arquivoentrada, tamanhoEntrada / 1000);
+    printf("Arquivo de saida: %s (%g bytes)\n", arquivosaida, tamanhoSaida / 1000);
+    printf("Tempo gasto: %g segundos\n", tempoGasto);
+    printf("Taxa de descompressao: %d%%\n", (int)((100 * tamanhoSaida) / tamanhoEntrada));
+    destroyTree(tree); //Libera espaço de memoria para a queue usada para montar a arvore de huffman
+    fclose(entrada);   //Fecha o arquivo de entrada
+    fclose(saida);     //Fecha o arquivo de saída
+}
+
+//Função que destroi nó por nó da fila
+void auxDestroyQueue(NodeHuff *node)
+{
+    if (!node)
+        return;
+    auxDestroyQueue(node->next); // Recursão para o proximo nó
+    free(node);                  // Libera o nó
+    return;
+}
+
+//Função que destroi nó por nó da arvore
+void auxDestroyTree(NodeHuff *node)
+{
+    if (!node)
+        return;
+    auxDestroyTree(node->left);  // Recursão para esquerda
+    auxDestroyTree(node->right); // Recursão para a direita
+    free(node);                  // Libera o nó
+    return;
+}
+
+//Função que libera a cabeça da fila
+void destroyQueue(Queue *queue)
+{
+    auxDestroyQueue(queue->first); //Libera todos os nós da fila
+    free(queue);                   //Libera a fila
+    return;
+}
+
+//Função que libera a raiz da arvore
+void destroyTree(Queue *tree)
+{
+    auxDestroyQueue(tree->first); //Libera todos os nós da arvore
+    free(tree);                   //Libera a fila
+    return;
 }
