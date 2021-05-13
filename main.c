@@ -1,118 +1,58 @@
+/*
+TRABALHO DE IMPLEMENTACAO DO CÓDIGO DE HUFFMAN (COMPRESSÃO E DESCOMPRESSÃO DE ARQUIVOS)
+AUTOR: LUIZ GUSTAVO FALQUETO e ERIC RABELO
+DATA CRIACAO: 12/05/2021
+ARQUIVO: main.c
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-//Procura por um caracter no vetor (retorna o indice do vetor caso encontrar ou -1 se encontrar)
-int isInArray(char *vetor, char c)
-{
-    int tam = strlen(vetor);
-    for (int i = 0; i < tam; i++)
-    {
-        if (vetor[i] == c)
-            return i;
-    }
-    return -1;
-}
+#include "huffman.h"
 
-void organizaVetores(char *vetorC, int *vetorI)
+int main()
 {
-    int i, j, auxI;
-    char auxC;
-    int tam = strlen(vetorC);
-    for (i = 0; i < tam - 1; i++)
+    int op = 7;
+    char arquivoentrada[50];
+    char arquivosaida[50];
+
+    while (op != 0)
     {
-        for (j = i + 1; j < tam; j++)
+        printf("\nEscolha a operacao a qual deseja realizar:\n");
+        printf("1 - Comprimir arquivo.\n");
+        printf("2 - Exibir ocorrencias e codigo de cada caractere\n");
+        printf("3 - Descomprimir arquivo.\n");
+        printf("0 - Sair.\n");
+        scanf("%d", &op);
+        switch (op)
         {
-            if (vetorI[i] > vetorI[j])
-            {
-                auxI = vetorI[i];
-                vetorI[i] = vetorI[j];
-                vetorI[j] = auxI;
-
-                auxC = vetorC[i];
-                vetorC[i] = vetorC[j];
-                vetorC[j] = auxC;
-            }
+        case 1:
+            printf("Digite o nome do arquivo de entrada: ");
+            scanf("%s", arquivoentrada);
+            printf("Digite o nome do arquivo de saida: ");
+            scanf("%s", arquivosaida);
+            comprimir(arquivoentrada, arquivosaida);
+            break;
+        case 2:
+            printf("As informacoes serao exibidas no seguinte formato:\n\ncaractere [ocorrencias]: sequencia de bits\n\n");
+            printf("Digite o nome do arquivo de entrada: ");
+            scanf("%s", arquivoentrada);
+            exibirCaracteres(arquivoentrada);
+            break;
+        case 3:
+            printf("Digite o nome do arquivo comprimido: ");
+            scanf("%s", arquivoentrada);
+            printf("Digite o nome do arquivo de saida: ");
+            scanf("%s", arquivosaida);
+            descomprimir(arquivoentrada, arquivosaida);
+            break;
+        case 0:
+            op = 0;
+            break;
+        default:
+            break;
         }
     }
-}
-
-int main(int argc, char const *argv[])
-{
-    FILE *pont_arq = fopen("arquivo.txt", "rb");
-    if (!pont_arq)
-    {
-        printf("Erro ao ler arquivo!\n");
-        fclose(pont_arq);
-        exit(1);
-    }
-    else
-    {
-        printf("Arquivo lido com sucesso!\n\n");
-    }
-
-    //------------------------------------------ Vetor com caracteres do arquivo ---------------------------
-    //------------------------------------------------------------------------------------------------------
-    int *frequencia;
-    char *caracteresArquivo;
-
-    int tamVet = 1;
-    caracteresArquivo = (char *)malloc(tamVet * sizeof(char));
-    frequencia = (int *)malloc(tamVet * sizeof(int));
-
-    if (!caracteresArquivo || !frequencia)
-    {
-        printf("Erro ao alocar memória!\n");
-        fclose(pont_arq);
-        exit(1);
-    }
-
-    int i = 0, j = 0, index;
-    char aux;
-    while (fscanf(pont_arq, "%c", &aux) != EOF)
-    {
-        if (aux != '\n')
-        {
-            if (tamVet > 1) //Se o vetor ja tem algum caracter inserido
-            {
-                index = isInArray(caracteresArquivo, aux); //Retornou o indice do caracter no vetor
-                if (index >= 0)
-                {
-                    frequencia[index]++;
-                }
-                else //Caracter não existe no vetor (adicionar no vetor)
-                {
-                    caracteresArquivo = (char *)realloc(caracteresArquivo, (tamVet + 1) * sizeof(char));
-                    frequencia = (int *)realloc(frequencia, (tamVet + 1) * sizeof(int));
-                    caracteresArquivo[j] = aux;
-                    frequencia[j] = 1;
-                    tamVet++;
-                    j++;
-                }
-            }
-            else
-            {
-                caracteresArquivo = (char *)realloc(caracteresArquivo, (tamVet + 1) * sizeof(char));
-                frequencia = (int *)realloc(frequencia, (tamVet + 1) * sizeof(int));
-                caracteresArquivo[j] = aux;
-                frequencia[j] = 1;
-                tamVet++;
-                j++;
-            }
-        }
-    }
-
-    organizaVetores(caracteresArquivo, frequencia);
-
-    for (int i = 0; i < tamVet - 1; i++)
-    {
-        printf("%c -> %d\n", caracteresArquivo[i], frequencia[i]);
-    }
-    printf("\n");
-
-    printf("\n");
-    fclose(pont_arq);
-    free(frequencia);
-    free(caracteresArquivo);
     return 0;
 }
